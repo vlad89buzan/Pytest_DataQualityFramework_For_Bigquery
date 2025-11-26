@@ -1,0 +1,13 @@
+{
+    "bq_load_dttm": {"type": "TIMESTAMP", "nullable": True},
+    "Code": {"type": "STRING", "nullable": True},
+    "Name": {"type": "STRING", "nullable": True},
+    "Kromka": {"type": "STRING", "nullable": True},
+    "Thickness": {"type": "INT64", "nullable": True},
+    "Length": {"type": "INT64", "nullable": True},
+    "Width": {"type": "INT64", "nullable": True},
+    "Stock_balance_in_sheets": {"type": "STRING", "nullable": True},
+    "Stock_balance_in_pieces": {"type": "STRING", "nullable": True},
+    "Reserve_balance_in_sheets": {"type": "STRING", "nullable": True},
+    "Reserve_balance_in_pieces": {"type": "STRING", "nullable": True}
+}

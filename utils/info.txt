@@ -1,0 +1,1 @@
+pytest   --html=reports/report_$(Get-Date -Format 'yyyyMMdd_HHmmss').html --self-contained-html

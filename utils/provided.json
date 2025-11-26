@@ -1,0 +1,48 @@
+
+
+
+[{
+  "column_name": "bq_load_dttm",
+  "data_type": "TIMESTAMP",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Code",
+  "data_type": "STRING",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Name",
+  "data_type": "STRING",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Kromka",
+  "data_type": "STRING",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Thickness",
+  "data_type": "INT64",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Length",
+  "data_type": "INT64",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Width",
+  "data_type": "INT64",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Stock_balance_in_sheets",
+  "data_type": "STRING",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Stock_balance_in_pieces",
+  "data_type": "STRING",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Reserve_balance_in_sheets",
+  "data_type": "STRING",
+  "is_nullable": "YES"
+}, {
+  "column_name": "Reserve_balance_in_pieces",
+  "data_type": "STRING",
+  "is_nullable": "YES"
+}]

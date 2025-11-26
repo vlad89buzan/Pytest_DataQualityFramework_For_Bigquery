@@ -14,3 +14,8 @@ pytest-html~=4.1.1
 
 # Parquet support engine for pandas
 pyarrow~=22.0.0
+
+# Bigquery
+google-cloud-bigquery
+db-dtypes
+google-cloud-bigquery-storage==2.34.0

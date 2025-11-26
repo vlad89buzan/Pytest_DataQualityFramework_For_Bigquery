@@ -11,7 +11,7 @@ class DataQualityLibrary:
     """
 
     @staticmethod
-    def check_duplicates(df: pd.DataFrame, column_names=None):
+    def check_duplicates(df: pd.DataFrame, column_names=None, check_each_column=False):
         """
         Check for duplicates in the DataFrame.
 
@@ -19,29 +19,44 @@ class DataQualityLibrary:
             df (pd.DataFrame): DataFrame to check.
             column_names (list, optional): Columns to check duplicates on.
                 If None, checks entire row.
+            check_each_column (bool, optional): If True and column_names is provided,
+                check duplicates **per column individually**.
 
         Raises:
             AssertionError: If duplicates are found, showing counts.
         """
         if column_names:
-            # Count duplicates based only on the subset of columns
-            duplicates = df[df.duplicated(subset=column_names, keep=False)]
-            if not duplicates.empty:
-                # Show counts of duplicates for clarity
-                dup_counts = (
-                    duplicates.groupby(column_names)
-                    .size()
-                    .reset_index(name='count')
-                    .sort_values('count', ascending=False)
-                )
-                raise AssertionError(
-                    f"Duplicate rows found on columns {column_names}:\n{dup_counts}"
-                )
+            if check_each_column:
+                # Check duplicates individually for each column
+                for col in column_names:
+                    duplicates = df[df.duplicated(subset=[col], keep=False)]
+                    if not duplicates.empty:
+                        dup_counts = (
+                            duplicates.groupby([col])
+                            .size()
+                            .reset_index(name='count')
+                            .sort_values('count', ascending=False)
+                        )
+                        raise AssertionError(
+                            f"Duplicate values found in column '{col}':\n{dup_counts}"
+                        )
+            else:
+                # Check duplicates based on combination of columns
+                duplicates = df[df.duplicated(subset=column_names, keep=False)]
+                if not duplicates.empty:
+                    dup_counts = (
+                        duplicates.groupby(column_names)
+                        .size()
+                        .reset_index(name='count')
+                        .sort_values('count', ascending=False)
+                    )
+                    raise AssertionError(
+                        f"Duplicate rows found on combination of columns {column_names}:\n{dup_counts}"
+                    )
         else:
             # Full-row duplicates
             duplicates = df[df.duplicated(keep=False)]
             if not duplicates.empty:
-                # Count duplicates based on all columns
                 dup_counts = (
                     duplicates.groupby(list(df.columns))
                     .size()
@@ -212,5 +227,124 @@ class DataQualityLibrary:
             )
         else:
             return pd.DataFrame(columns=df.columns)
+
+    @staticmethod
+    def check_table_exists(connector, table_name: str):
+        """
+        Check that a table exists in the data source.
+
+        Args:
+            connector: A database/BigQuery connector object with a method to list or query tables.
+            table_name (str): Full table identifier (e.g., 'dataset.table' or BigQuery 'project.dataset.table').
+
+        Raises:
+            AssertionError: If the table does not exist.
+        """
+        try:
+            # Attempt to fetch a single row to confirm table exists
+            sql = f"SELECT 1 FROM `{table_name}` LIMIT 1"
+            df = connector.get_data_sql(sql)
+            # If DataFrame is returned, table exists
+            assert df is not None, f"Query returned None for table {table_name}"
+        except Exception as e:
+            raise AssertionError(f"Table {table_name} does not exist or is not accessible. Error: {e}")
+
+    @staticmethod
+    def check_table_is_not_empty(connector, table_name: str, limit: int = 1):
+        """
+        Check that a table is not empty.
+
+        Args:
+            connector: A database/BigQuery connector object with a method `get_data_sql`.
+            table_name (str): Full table identifier (e.g., 'dataset.table' or 'project.dataset.table').
+            limit (int, optional): Number of rows to fetch. Default is 1.
+
+        Raises:
+            AssertionError: If the table is empty.
+        """
+        sql = f"SELECT * FROM `{table_name}` LIMIT {limit}"
+        df = connector.get_data_sql(sql)
+        assert not df.empty, f"Table {table_name} is empty"
+
+    @staticmethod
+    def check_table_schema(bq_connector, table_name: str, expected_schema: dict):
+        """
+        Validate that a BigQuery table schema matches expected schema.
+
+        Args:
+            bq_connector: BigQuery connector with .client attribute.
+            table_name (str): Full BigQuery table name: "dataset.table" or "project.dataset.table"
+            expected_schema (dict): Expected column definitions:
+                {
+                    "column_name": {
+                        "type": "STRING|INT64|FLOAT64|DATE|TIMESTAMP|BOOLEAN|...",
+                        "nullable": True/False
+                    },
+                    ...
+                }
+
+        Raises:
+            AssertionError: When there are mismatches in schema.
+        """
+        # Load actual schema from BigQuery
+        table = bq_connector.client.get_table(table_name)
+        actual_schema = {field.name: field for field in table.schema}
+
+        errors = []
+
+        # 1. Check missing or mismatched columns
+        for col, expected in expected_schema.items():
+            if col not in actual_schema:
+                errors.append(f"Missing column: {col}")
+                continue
+
+            field = actual_schema[col]
+
+            # Compare data type
+            # Compare data type with normalization
+            actual_type = field.field_type.upper()
+            expected_type = expected["type"].upper()
+
+            TYPE_EQUIVALENTS = {
+                "INTEGER": "INT64",
+                "INT64": "INT64",
+                "FLOAT": "FLOAT64",
+                "FLOAT64": "FLOAT64",
+                "BOOLEAN": "BOOL",
+                "BOOL": "BOOL",
+                "STRING": "STRING",
+                "BYTES": "BYTES",
+                "DATE": "DATE",
+                "TIMESTAMP": "TIMESTAMP",
+            }
+
+            actual_type_norm = TYPE_EQUIVALENTS.get(actual_type, actual_type)
+            expected_type_norm = TYPE_EQUIVALENTS.get(expected_type, expected_type)
+
+            if actual_type_norm != expected_type_norm:
+                errors.append(
+                    f"Type mismatch for '{col}': expected {expected_type_norm}, got {actual_type_norm}"
+                )
+
+            # Compare nullability
+            actual_nullable = (field.mode.upper() == "NULLABLE")
+            expected_nullable = expected["nullable"]
+
+            if actual_nullable != expected_nullable:
+                errors.append(
+                    f"Nullability mismatch for '{col}': expected nullable={expected_nullable}, got nullable={actual_nullable}"
+                )
+
+        # 2. Check extra columns (not expected)
+        for col in actual_schema:
+            if col not in expected_schema:
+                errors.append(f"Unexpected column in table: {col}")
+
+        # Raise if errors exist
+        if errors:
+            raise AssertionError(
+                f"Schema validation failed for table '{table_name}':\n" +
+                "\n".join(errors)
+            )
 
 
