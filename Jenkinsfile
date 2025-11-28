@@ -13,54 +13,57 @@ pipeline {
 
     stages {
 
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Prepare Python Environment') {
             steps {
                 sh '''
-                    echo "Creating virtual environment..."
                     python3 -m venv ${VENV}
-
-                    echo "Upgrading pip inside venv..."
                     ${VENV}/bin/pip install --upgrade pip
-
-                    echo "Installing dependencies inside venv..."
                     ${VENV}/bin/pip install -r requirements.txt
-                    ${VENV}/bin/pip install pyyaml pytest pytest-html
-
-                    echo "Python version inside venv:"
-                    ${VENV}/bin/python --version
-                    ${VENV}/bin/pip --version
+                    ${VENV}/bin/pip install pyyaml pytest pytest-html google-cloud-bigquery google-auth
                 '''
             }
         }
 
-        stage('Read Environment Config') {
+        stage('Determine Credentials') {
             steps {
-                sh '''
-                    echo "Reading ENV config for ${ENV}"
-                    ${VENV}/bin/python ci/read_env_config.py ${ENV}
-                '''
+                script {
+                    if (params.ENV == "npd5") {
+                        env.GCP_CREDS = "gcp-npd5"   // <-- change to your actual Jenkins credentialsId
+                    } else if (params.ENV == "npd4") {
+                        env.GCP_CREDS = "gcp-npd4"   // <-- change to your actual Jenkins credentialsId
+                    } else {
+                        error "Unknown environment: ${params.ENV}"
+                    }
+                    echo "Using GCP credentials: ${env.GCP_CREDS}"
+                }
             }
         }
 
         stage('Run Pytest') {
             steps {
-                sh """
-                    echo "Running tests..."
+                withCredentials([file(credentialsId: "${GCP_CREDS}", variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                    sh """
+                        mkdir -p reports
 
-                    mkdir -p reports
+                        MARKER_OPTION=""
+                        if [ ! -z "${MARKERS}" ]; then
+                            MARKER_OPTION="-m '${MARKERS}'"
+                        fi
 
-                    MARKER_OPTION=""
-                    if [ ! -z "${MARKERS}" ]; then
-                        MARKER_OPTION="-m ${MARKERS}"
-                    fi
-
-                    ${VENV}/bin/pytest \
-                        --env ${ENV} \
-                        $MARKER_OPTION \
-                        --html=reports/report.html \
-                        --self-contained-html \
-                        --junitxml=reports/results.xml
-                """
+                        ${VENV}/bin/pytest \
+                            --env ${ENV} \
+                            $MARKER_OPTION \
+                            --html=reports/report.html \
+                            --self-contained-html \
+                            --junitxml=reports/results.xml
+                    """
+                }
             }
         }
 
