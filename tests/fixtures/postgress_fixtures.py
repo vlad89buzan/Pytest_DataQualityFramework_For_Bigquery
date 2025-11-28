@@ -1,6 +1,7 @@
 from src.connectors.postgres.postgres_connector import PostgresConnectorContextManager
 import pytest
 
+
 def pytest_addoption(parser):
     parser.addoption("--db_host", action="store", default="localhost", help="Database host")
     parser.addoption("--db_port", action="store", default=5434, help="Database port")
@@ -29,11 +30,11 @@ def db_connection(request):
 
     try:
         with PostgresConnectorContextManager(
-            db_host=db_host,
-            db_name=db_name,
-            db_user=db_user,
-            db_password=db_password,
-            db_port=db_port
+                db_host=db_host,
+                db_name=db_name,
+                db_user=db_user,
+                db_password=db_password,
+                db_port=db_port
         ) as db_connector:
             yield db_connector
     except Exception as e:

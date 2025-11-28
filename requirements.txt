@@ -19,3 +19,6 @@ pyarrow~=22.0.0
 google-cloud-bigquery
 db-dtypes
 google-cloud-bigquery-storage==2.34.0
+
+# Yaml
+PyYAML>=6.0

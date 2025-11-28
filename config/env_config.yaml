@@ -1,0 +1,57 @@
+prd:
+  credentials: "C:/keys/prd.json"
+  project: "project1"
+  dataset: "dataset"
+  tables:
+    AGT: "project1.dataset.AGT"
+
+ppd:
+  credentials: "C:/keys/ppd.json"
+  project: "project2"
+  dataset: "dataset"
+  tables:
+    AGT: "project2.dataset.AGT"
+
+ppd1:
+  credentials: "C:/keys/ppd1.json"
+  project: "project2"
+  dataset: "dataset_ws1"
+  tables:
+    AGT: "project2.dataset_ws1.AGT"
+
+npd1:
+  credentials: "C:/keys/npd1.json"
+  project: "project3"
+  dataset: "dataset"
+  tables:
+    AGT: "project3.dataset.AGT"
+
+npd2:
+  credentials: "C:/keys/npd2.json"
+  project: "project3"
+  dataset: "dataset_ws1"
+  tables:
+    AGT: "project3.dataset_ws1.AGT"
+
+npd3:
+  credentials: "C:/keys/npd3.json"
+  project: "project3"
+  dataset: "dataset_ws2"
+  tables:
+    AGT: "project3.dataset_ws2.AGT"
+
+npd4:
+  credentials: "C:/Users/Vladyslav_Buzan/Downloads/scalov-2efd40d6aeca.json"
+  project: "scalov"
+  dataset: "dataset_ws3"
+  tables:
+    AGT: "scalov.pieces_ws1.AGT"
+    AGT_381: "scalov.pieces_ws1.AGT_381"
+
+npd5:
+  credentials: "C:/Users/Vladyslav_Buzan/Downloads/scalov-2efd40d6aeca.json"
+  project: "scalov"
+  dataset: "dataset_ws4"
+  tables:
+    AGT: "scalov.pieces.AGT"
+    AGT_381: "scalov.pieces.AGT_381"

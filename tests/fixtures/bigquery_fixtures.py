@@ -1,20 +1,23 @@
 from src.connectors.bigquery.bigquery_connector import BigQueryConnectorContextManager
 import pytest
+import os
 
 
 # Optionally, read credentials path from env variable or pytest option
-CREDENTIALS_PATH = r"C:\Users\Vladyslav_Buzan\Downloads\scalov-2efd40d6aeca.json"
-PROJECT_ID = "scalov"
+
 
 @pytest.fixture(scope="session")
-def bq_connector():
+def bq_connector(environment):
     """
     Pytest fixture that provides a BigQueryConnectorContextManager instance.
     Scope 'session' so it's created once per test session.
     """
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = environment["credentials"]
+    project_id = environment["project"]
+    credentials_path = environment["credentials"]
+
     with BigQueryConnectorContextManager(
-        project_id=PROJECT_ID,
-        credentials_path=CREDENTIALS_PATH
+            project_id=project_id,
+            credentials_path=credentials_path
     ) as connector:
         yield connector
-
