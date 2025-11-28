@@ -19,16 +19,16 @@ pipeline {
                     echo "Creating virtual environment..."
                     python3 -m venv ${VENV}
 
-                    echo "Activating venv..."
-                    . ${VENV}/bin/activate
+                    echo "Upgrading pip inside venv..."
+                    ${VENV}/bin/pip install --upgrade pip
 
-                    echo "Installing dependencies..."
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pip install pyyaml pytest pytest-html
+                    echo "Installing dependencies inside venv..."
+                    ${VENV}/bin/pip install -r requirements.txt
+                    ${VENV}/bin/pip install pyyaml pytest pytest-html
 
-                    echo "Python inside venv:"
+                    echo "Python version inside venv:"
                     ${VENV}/bin/python --version
+                    ${VENV}/bin/pip --version
                 '''
             }
         }
@@ -36,7 +36,7 @@ pipeline {
         stage('Read Environment Config') {
             steps {
                 sh '''
-                    . ${VENV}/bin/activate
+                    echo "Reading ENV config for ${ENV}"
                     ${VENV}/bin/python ci/read_env_config.py ${ENV}
                 '''
             }
@@ -45,15 +45,20 @@ pipeline {
         stage('Run Pytest') {
             steps {
                 sh """
-                    . ${VENV}/bin/activate
+                    echo "Running tests..."
 
                     mkdir -p reports
 
-                    ${VENV}/bin/pytest \\
-                        --env ${ENV} \\
-                        ${MARKERS ? "-m ${MARKERS}" : ""} \\
-                        --html=reports/report.html \\
-                        --self-contained-html \\
+                    MARKER_OPTION=""
+                    if [ ! -z "${MARKERS}" ]; then
+                        MARKER_OPTION="-m ${MARKERS}"
+                    fi
+
+                    ${VENV}/bin/pytest \
+                        --env ${ENV} \
+                        $MARKER_OPTION \
+                        --html=reports/report.html \
+                        --self-contained-html \
                         --junitxml=reports/results.xml
                 """
             }
