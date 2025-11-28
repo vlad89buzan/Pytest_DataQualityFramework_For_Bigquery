@@ -3,36 +3,32 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'ENV', choices: ['npd', 'ws5', 'prod'], description: 'Select environment to run tests')
-        string(name: 'MARKERS', defaultValue: '', description: 'Run only tests with these pytest markers')
+        choice(name: 'ENV', choices: ['npd5', 'npd4'], description: 'Select environment')
+        string(name: 'MARKERS', defaultValue: '', description: 'Run only tests with markers')
+    }
+
+    environment {
+        VENV = "venv"
     }
 
     stages {
 
-        stage('Install Python') {
+        stage('Prepare Python Environment') {
             steps {
                 sh '''
-                    echo "Installing Python 3 and pip..."
+                    echo "Creating virtual environment..."
+                    python3 -m venv ${VENV}
 
-                    if ! command -v python3 >/dev/null 2>&1; then
-                        sudo apt-get update
-                        sudo apt-get install -y python3 python3-pip python3-venv
-                    else
-                        echo "Python3 already installed"
-                    fi
+                    echo "Activating venv..."
+                    . ${VENV}/bin/activate
 
-                    python3 --version
-                    pip3 --version
-                '''
-            }
-        }
+                    echo "Installing dependencies..."
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                    pip install pyyaml pytest pytest-html
 
-        stage('Install Python Dependencies') {
-            steps {
-                sh '''
-                    pip3 install --upgrade pip
-                    pip3 install -r requirements.txt
-                    pip3 install pyyaml
+                    echo "Python inside venv:"
+                    ${VENV}/bin/python --version
                 '''
             }
         }
@@ -40,7 +36,8 @@ pipeline {
         stage('Read Environment Config') {
             steps {
                 sh '''
-                    python3 ci/read_env_config.py ${ENV}
+                    . ${VENV}/bin/activate
+                    ${VENV}/bin/python ci/read_env_config.py ${ENV}
                 '''
             }
         }
@@ -48,9 +45,11 @@ pipeline {
         stage('Run Pytest') {
             steps {
                 sh """
-                    echo "Running pytest on environment: ${ENV}"
+                    . ${VENV}/bin/activate
 
-                    pytest \\
+                    mkdir -p reports
+
+                    ${VENV}/bin/pytest \\
                         --env ${ENV} \\
                         ${MARKERS ? "-m ${MARKERS}" : ""} \\
                         --html=reports/report.html \\
@@ -70,7 +69,7 @@ pipeline {
 
     post {
         always {
-            echo "Pipeline completed."
+            echo "Pipeline finished."
         }
     }
 }
