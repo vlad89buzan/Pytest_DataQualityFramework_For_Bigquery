@@ -34,9 +34,9 @@ pipeline {
             steps {
                 script {
                     if (params.ENV == "npd5") {
-                        env.GCP_CREDS = "gcp-npd5"   // <-- change to your actual Jenkins credentialsId
+                        env.GCP_CREDS = "npd5"   // <-- change to your actual Jenkins credentialsId
                     } else if (params.ENV == "npd4") {
-                        env.GCP_CREDS = "gcp-npd4"   // <-- change to your actual Jenkins credentialsId
+                        env.GCP_CREDS = "npd4"   // <-- change to your actual Jenkins credentialsId
                     } else {
                         error "Unknown environment: ${params.ENV}"
                     }
