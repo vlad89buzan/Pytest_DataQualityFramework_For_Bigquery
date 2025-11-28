@@ -47,14 +47,16 @@ pipeline {
 
         stage('Run Pytest') {
             steps {
-                withCredentials([file(credentialsId: "${GCP_CREDS}", variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                    sh """
+                withCredentials([file(credentialsId: "${env.GCP_CREDS}", variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                    sh '''
                         mkdir -p reports
 
                         MARKER_OPTION=""
-                        if [ ! -z "${MARKERS}" ]; then
+                        if [ -n "${MARKERS}" ]; then
                             MARKER_OPTION="-m '${MARKERS}'"
                         fi
+
+                        echo "Running tests with marker option: $MARKER_OPTION"
 
                         ${VENV}/bin/pytest \
                             --env ${ENV} \
@@ -62,7 +64,7 @@ pipeline {
                             --html=reports/report.html \
                             --self-contained-html \
                             --junitxml=reports/results.xml
-                    """
+                    '''
                 }
             }
         }
