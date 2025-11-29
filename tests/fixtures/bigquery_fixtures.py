@@ -12,7 +12,6 @@ def bq_connector(environment):
     Pytest fixture that provides a BigQueryConnectorContextManager instance.
     Scope 'session' so it's created once per test session.
     """
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = environment["credentials"]
     project_id = environment["project"]
     credentials_path = environment["credentials"]
 

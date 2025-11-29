@@ -1,47 +1,47 @@
 prd:
-  credentials: "C:/keys/prd.json"
+  credentials: ${GSA_PRD}
   project: "project1"
   dataset: "dataset"
   tables:
     AGT: "project1.dataset.AGT"
 
 ppd:
-  credentials: "C:/keys/ppd.json"
+  credentials: ${GSA_PPD}
   project: "project2"
   dataset: "dataset"
   tables:
     AGT: "project2.dataset.AGT"
 
 ppd1:
-  credentials: "C:/keys/ppd1.json"
+  credentials: ${GSA_PPD}
   project: "project2"
   dataset: "dataset_ws1"
   tables:
     AGT: "project2.dataset_ws1.AGT"
 
 npd1:
-  credentials: "C:/keys/npd1.json"
+  credentials: ${GSA_NPD}
   project: "project3"
   dataset: "dataset"
   tables:
     AGT: "project3.dataset.AGT"
 
 npd2:
-  credentials: "C:/keys/npd2.json"
+  credentials: ${GSA_NPD}
   project: "project3"
   dataset: "dataset_ws1"
   tables:
     AGT: "project3.dataset_ws1.AGT"
 
 npd3:
-  credentials: "C:/keys/npd3.json"
+  credentials: ${GSA_NPD}
   project: "project3"
   dataset: "dataset_ws2"
   tables:
     AGT: "project3.dataset_ws2.AGT"
 
 npd4:
-  credentials: "C:/Users/Vladyslav_Buzan/Downloads/scalov-2efd40d6aeca.json"
+  credentials: ${GSA_NPD}
   project: "scalov"
   dataset: "dataset_ws3"
   tables:
@@ -49,7 +49,7 @@ npd4:
     AGT_381: "scalov.pieces_ws1.AGT_381"
 
 npd5:
-  credentials: "C:/Users/Vladyslav_Buzan/Downloads/scalov-2efd40d6aeca.json"
+  credentials: ${GSA_NPD}
   project: "scalov"
   dataset: "dataset_ws4"
   tables:

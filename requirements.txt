@@ -22,3 +22,8 @@ google-cloud-bigquery-storage==2.34.0
 
 # Yaml
 PyYAML>=6.0
+
+
+# dotenv
+python-dotenv>=1.0.0
+
