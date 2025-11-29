@@ -44,18 +44,16 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    // Determine which credential file to inject
                     def credId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
                                  params.ENV in ['ppd', 'ppd1'] ? 'GSA_PPD' :
                                  params.ENV == 'prd' ? 'GSA_PRD' :
                                  error("Unknown environment: ${params.ENV}")
 
-                    // Inject the actual JSON file path into the correct env var name
-                    withCredentials([file(credentialsId: credId, variable: 'CREDS_FILE') {
+                    withCredentials([file(credentialsId: credId, variable: 'CREDS_FILE')]) {
                         withEnv([
-                            "GSA_NPD=${params.ENV.startsWith('npd') ? CREDS_FILE : ''}",
-                            "GSA_PPD=${params.ENV in ['ppd', 'ppd1'] ? CREDS_FILE : ''}",
-                            "GSA_PRD=${params.ENV == 'prd' ? CREDS_FILE : ''}"
+                            "GSA_NPD=${ (params.ENV in ['npd1','npd2','npd3','npd4','npd5']) ? CREDS_FILE : '' }",
+                            "GSA_PPD=${ (params.ENV in ['ppd','ppd1']) ? CREDS_FILE : '' }",
+                            "GSA_PRD=${ (params.ENV == 'prd') ? CREDS_FILE : '' }"
                         ]) {
                             sh '''
                                 #!/usr/bin/env bash
@@ -63,16 +61,16 @@ pipeline {
                                 . ${VENV_DIR}/bin/activate
                                 mkdir -p ${REPORTS_DIR}
 
+                                echo "Running tests on ${ENV}"
+                                echo "Using credentials file for ${ENV}: $(eval echo \$GSA_${ENV^^} 2>/dev/null || echo 'NOT FOUND')"
+
                                 MARKER_ARG=""
                                 [ -n "${MARKERS:-}" ] && MARKER_ARG="-m ${MARKERS}"
 
-                                echo "Running tests on environment: ${ENV}"
-                                echo "Using credentials file: $(eval echo \$GSA_${ENV^^})"
-
-                                pytest --env ${ENV} \\
-                                       -v \\
-                                       --tb=short \\
-                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \\
+                                pytest --env ${ENV} \
+                                       -v \
+                                       --tb=short \
+                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \
                                        $MARKER_ARG
                             '''
                         }
