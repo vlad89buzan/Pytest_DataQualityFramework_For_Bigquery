@@ -8,6 +8,7 @@ pipeline {
 
     environment {
         REPORTS_DIR = 'reports'
+        VENV_DIR = 'venv'
     }
 
     stages {
@@ -17,39 +18,42 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Setup Python Environment') {
             steps {
-                sh 'pip install -r requirements.txt'
+                sh '''
+                    # Create virtual environment
+                    python3 -m venv ${VENV_DIR}
+                    source ${VENV_DIR}/bin/activate
+                    # Upgrade pip
+                    pip install --upgrade pip
+                    # Install dependencies
+                    pip install -r requirements.txt
+                '''
             }
         }
 
-        stage('Set Credentials and Run Tests') {
+        stage('Run Tests') {
             steps {
                 script {
-                    // Map environment to credential ID and env var
-                    def credsId = ''
-                    def credsEnvVar = ''
-                    if (params.ENV.startsWith('npd')) {
-                        credsId = 'GSA_NPD'
-                        credsEnvVar = 'GSA_NPD'
-                    } else if (params.ENV.startsWith('ppd')) {
-                        credsId = 'GSA_PPD'
-                        credsEnvVar = 'GSA_PPD'
-                    } else if (params.ENV == 'prd') {
-                        credsId = 'GSA_PRD'
-                        credsEnvVar = 'GSA_PRD'
-                    } else {
-                        error "Unknown environment: ${params.ENV}"
-                    }
+                    // Map ENV to credentials
+                    def credsId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
+                                  params.ENV.startsWith('ppd') ? 'GSA_PPD' :
+                                  params.ENV == 'prd' ? 'GSA_PRD' : error("Unknown environment: ${params.ENV}")
 
-                    // Inject the secret file as environment variable
+                    def credsEnvVar = credsId
+
                     withCredentials([file(credentialsId: credsId, variable: credsEnvVar)]) {
-                        // Run pytest with environment parameter and optional markers
-                        def pytest_cmd = "pytest --env ${params.ENV} -v --tb=short"
+                        // Build pytest command
+                        def pytestCmd = "pytest --env ${params.ENV} -v --tb=short"
                         if (params.MARKERS) {
-                            pytest_cmd += " -m \"${params.MARKERS}\""
+                            pytestCmd += " -m \"${params.MARKERS}\""
                         }
-                        sh pytest_cmd
+
+                        // Activate virtual environment and run tests
+                        sh """
+                            source ${VENV_DIR}/bin/activate
+                            ${pytestCmd}
+                        """
                     }
                 }
             }
@@ -58,7 +62,7 @@ pipeline {
         stage('Archive and Show Latest Report') {
             steps {
                 script {
-                    sh 'mkdir -p reports'
+                    sh 'mkdir -p ${REPORTS_DIR}'
                     archiveArtifacts artifacts: 'reports/*.html', fingerprint: true
                     def latestReport = sh(script: "ls -t reports/*.html | head -1", returnStdout: true).trim()
                     echo "Latest HTML report: ${latestReport}"
@@ -69,7 +73,8 @@ pipeline {
 
     post {
         always {
-            junit '**/reports/*.xml'  // optional if generating XML
+            // Optionally publish junit XML if your tests generate it
+            junit '**/reports/*.xml'
         }
     }
 }
