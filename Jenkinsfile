@@ -6,7 +6,6 @@ pipeline {
                description: 'Target BigQuery environment')
         string(name: 'MARKERS', defaultValue: '', trim: true,
                description: 'Pytest markers (e.g. smoke or "critical and not slow")')
-
     }
 
     environment {
@@ -30,18 +29,19 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh """
+                sh '''
                     python3 -m venv ${VENV_DIR}
                     . ${VENV_DIR}/bin/activate
                     pip install --upgrade pip setuptools wheel
                     pip install -r requirements.txt
-                """
+                '''
             }
         }
 
         stage('Run Tests') {
             steps {
                 script {
+                    // Map environment to Jenkins credential ID
                     def credId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
                                  params.ENV in ['ppd','ppd1'] ? 'GSA_PPD' :
                                  params.ENV == 'prd' ? 'GSA_PRD' :
@@ -55,23 +55,24 @@ pipeline {
                         ]
 
                         withEnv(envVars) {
-                            sh """
+                            sh '''
+                                #!/usr/bin/env bash
                                 set -euo pipefail
                                 . ${VENV_DIR}/bin/activate
                                 mkdir -p ${REPORTS_DIR}
 
                                 echo "Running tests on ${ENV}"
-                                echo "Using credentials file for ${ENV}: \$(eval echo \$GSA_\${ENV^^} 2>/dev/null || echo 'NOT FOUND')"
+                                echo "Using credentials file for ${ENV}: $(eval echo \$GSA_${ENV^^} 2>/dev/null || echo 'NOT FOUND')"
 
                                 MARKER_ARG=""
-                                [ -n "${MARKERS:-}" ] && MARKER_ARG="-m '${MARKERS}'"
+                                [ -n "${MARKERS}" ] && MARKER_ARG="-m '${MARKERS}'"
 
-                                pytest --env ${ENV} \\
-                                       -v \\
-                                       --tb=short \\
-                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \\
-                                       \$MARKER_ARG
-                            """
+                                pytest --env ${ENV} \
+                                       -v \
+                                       --tb=short \
+                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \
+                                       $MARKER_ARG
+                            '''
                         }
                     }
                 }
