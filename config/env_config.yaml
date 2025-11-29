@@ -1,8 +1,9 @@
 prd:
-  credentials: ${GSA_PRD}
-  project: "project1"
+  credentials: ${GSA_NPD}
+  project: "scalov"
   tables:
-    AGT: "project1.dataset.AGT"
+    AGT: "scalov.pieces.AGT"
+    AGT_381: "scalov.pieces.AGT_381"
 
 ppd:
   credentials: ${GSA_PPD}
