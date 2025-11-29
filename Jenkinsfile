@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'ENV', choices: ['npd1','npd2','npd3','npd4','npd5','ppd','ppd1','prd'], description: 'Environment to test')
+        choice(name: 'ENV', choices: ['npd5','npd2','npd3','npd4','npd1','ppd','ppd1','prd'], description: 'Environment to test')
         string(name: 'MARKS', defaultValue: '', description: 'Optional pytest markers, e.g., "smoke or regression"')
     }
 

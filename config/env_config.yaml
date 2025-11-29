@@ -1,49 +1,42 @@
 prd:
   credentials: ${GSA_PRD}
   project: "project1"
-  dataset: "dataset"
   tables:
     AGT: "project1.dataset.AGT"
 
 ppd:
   credentials: ${GSA_PPD}
   project: "project2"
-  dataset: "dataset"
   tables:
     AGT: "project2.dataset.AGT"
 
 ppd1:
   credentials: ${GSA_PPD}
   project: "project2"
-  dataset: "dataset_ws1"
   tables:
     AGT: "project2.dataset_ws1.AGT"
 
 npd1:
   credentials: ${GSA_NPD}
   project: "project3"
-  dataset: "dataset"
   tables:
     AGT: "project3.dataset.AGT"
 
 npd2:
   credentials: ${GSA_NPD}
   project: "project3"
-  dataset: "dataset_ws1"
   tables:
     AGT: "project3.dataset_ws1.AGT"
 
 npd3:
   credentials: ${GSA_NPD}
   project: "project3"
-  dataset: "dataset_ws2"
   tables:
     AGT: "project3.dataset_ws2.AGT"
 
 npd4:
   credentials: ${GSA_NPD}
   project: "scalov"
-  dataset: "dataset_ws3"
   tables:
     AGT: "scalov.pieces_ws1.AGT"
     AGT_381: "scalov.pieces_ws1.AGT_381"
@@ -51,7 +44,6 @@ npd4:
 npd5:
   credentials: ${GSA_NPD}
   project: "scalov"
-  dataset: "dataset_ws4"
   tables:
     AGT: "scalov.pieces.AGT"
     AGT_381: "scalov.pieces.AGT_381"
