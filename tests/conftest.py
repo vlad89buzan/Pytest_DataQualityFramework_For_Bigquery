@@ -59,15 +59,16 @@ def pytest_itemcollected(item):
 
 def pytest_configure(config):
     """
-    Automatically generate timestamped HTML report
+    Automatically generate timestamped HTML report with env name in the filename
     """
     # Ensure reports folder exists
     os.makedirs("reports", exist_ok=True)
 
     # Only set HTML report if not provided via CLI
     if not config.option.htmlpath:
+        env_name = config.getoption("env")
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_path = f"reports/report_{timestamp}.html"
+        report_path = f"reports/{env_name}_report_{timestamp}.html"
         config.option.htmlpath = report_path
 
     # Ensure self-contained HTML
