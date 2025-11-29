@@ -2,28 +2,22 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'ENV', defaultValue: 'npd5', description: 'Environment to run tests on (npd5, ppd, prd, etc.)')
-        string(name: 'MARKERS', defaultValue: '', description: 'Optional pytest markers')
+        string(name: 'ENV', defaultValue: 'npd5', description: 'Environment: npd5, ppd, prd')
+        string(name: 'MARKERS', defaultValue: '', description: 'Pytest markers (optional)')
     }
 
     environment {
-        VENV_DIR = "venv"
-    }
-
-    options {
-        timestamps()
-        timeout(time: 1, unit: 'HOURS')
+        VENV_DIR = 'venv'
     }
 
     stages {
-
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Setup Python') {
             steps {
                 sh """
                     python3 -m venv ${VENV_DIR}
@@ -34,62 +28,53 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
+        stage('Determine GCP Credentials') {
             steps {
                 script {
-                    // Select the proper GSA creds based on ENV prefix
-                    def envPrefix = params.ENV?.toLowerCase() ?: ''
-                    def gsa_creds = ''
-                    if (envPrefix.startsWith('npd')) {
-                        gsa_creds = 'GSA_NPD'
-                    } else if (envPrefix.startsWith('ppd')) {
-                        gsa_creds = 'GSA_PPD'
-                    } else if (envPrefix.startsWith('prd')) {
-                        gsa_creds = 'GSA_PRD'
-                    } else {
-                        error "Unknown environment prefix: ${params.ENV}"
+                    // Select correct Jenkins secret file based on ENV prefix
+                    def envPrefix = params.ENV.toLowerCase()
+                    def gsaCreds = envPrefix.startsWith('npd') ? 'GSA_NPD' :
+                                   envPrefix.startsWith('ppd') ? 'GSA_PPD' :
+                                   envPrefix.startsWith('prd') ? 'GSA_PRD' : null
+
+                    if (gsaCreds == null) {
+                        error "Unknown ENV prefix: ${params.ENV}"
                     }
 
-                    withCredentials([file(credentialsId: gsa_creds, variable: 'GSA_')]) {
-                        withEnv(["MARKERS=${params.MARKERS ?: ''}"]) {
-                            sh """
-                                set -euo pipefail
-                                . ${VENV_DIR}/bin/activate
-                                mkdir -p reports
-                                echo "Running tests on ${params.ENV}"
-                                echo "Using credentials file: \$GSA_"
-                                pytest tests/ \$MARKERS --html=reports/report.html
-                            """
-                        }
-                    }
+                    env.GSA_CREDS = gsaCreds
                 }
             }
         }
 
-        stage('Publish Reports') {
+        stage('Run Tests') {
             steps {
-                publishHTML(target: [
-                    reportName: 'Test Report',
-                    reportDir: 'reports',
-                    reportFiles: 'report.html',
-                    keepAll: true,
-                    alwaysLinkToLastBuild: true,
-                    allowMissing: false
-                ])
+                withCredentials([file(credentialsId: env.GSA_CREDS, variable: 'CREDS_FILE')]) {
+                    sh """
+                        set -euo pipefail
+                        . ${VENV_DIR}/bin/activate
+                        echo "Using credentials file: \$CREDS_FILE"
+
+                        # Run pytest with or without markers
+                        if [ -z "${params.MARKERS}" ]; then
+                            pytest
+                        else
+                            pytest -m "${params.MARKERS}"
+                        fi
+                    """
+                }
             }
         }
-
     }
 
     post {
         always {
-            sh "rm -rf ${VENV_DIR}"
-        }
-        success {
-            echo "✅ Tests completed successfully."
+            archiveArtifacts artifacts: 'reports/*.html', allowEmptyArchive: true
         }
         failure {
-            echo "❌ Tests failed — see HTML report for details."
+            echo "❌ FAILURE — DQ checks failed. Check HTML reports in artifacts."
+        }
+        success {
+            echo "✅ SUCCESS — DQ checks passed."
         }
     }
 }
