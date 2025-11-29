@@ -21,12 +21,9 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 sh '''
-                    # Create virtual environment
                     python3 -m venv ${VENV_DIR}
-                    source ${VENV_DIR}/bin/activate
-                    # Upgrade pip
+                    . ${VENV_DIR}/bin/activate
                     pip install --upgrade pip
-                    # Install dependencies
                     pip install -r requirements.txt
                 '''
             }
@@ -35,24 +32,15 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    // Map ENV to credentials
                     def credsId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
                                   params.ENV.startsWith('ppd') ? 'GSA_PPD' :
                                   params.ENV == 'prd' ? 'GSA_PRD' : error("Unknown environment: ${params.ENV}")
-
                     def credsEnvVar = credsId
 
                     withCredentials([file(credentialsId: credsId, variable: credsEnvVar)]) {
-                        // Build pytest command
-                        def pytestCmd = "pytest --env ${params.ENV} -v --tb=short"
-                        if (params.MARKERS) {
-                            pytestCmd += " -m \"${params.MARKERS}\""
-                        }
-
-                        // Activate virtual environment and run tests
                         sh """
-                            source ${VENV_DIR}/bin/activate
-                            ${pytestCmd}
+                            . ${VENV_DIR}/bin/activate
+                            pytest --env ${params.ENV} -v --tb=short ${params.MARKERS:+-m "$MARKERS"}
                         """
                     }
                 }
@@ -73,7 +61,6 @@ pipeline {
 
     post {
         always {
-            // Optionally publish junit XML if your tests generate it
             junit '**/reports/*.xml'
         }
     }
