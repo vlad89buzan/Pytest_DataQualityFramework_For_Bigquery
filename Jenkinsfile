@@ -6,8 +6,7 @@ pipeline {
                description: 'Target BigQuery environment')
         string(name: 'MARKERS', defaultValue: '', trim: true,
                description: 'Pytest markers (e.g. smoke or "critical and not slow")')
-        booleanParam(name: 'CLEAN_WORKSPACE', defaultValue: true,
-                     description: 'Clean workspace before build')
+
     }
 
     environment {
@@ -22,22 +21,21 @@ pipeline {
     }
 
     stages {
-        stage('Prepare Workspace') {
-            when { expression { params.CLEAN_WORKSPACE } }
+
+        stage('Checkout') {
             steps {
-                cleanWs()
                 checkout scm
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh '''
+                sh """
                     python3 -m venv ${VENV_DIR}
                     . ${VENV_DIR}/bin/activate
                     pip install --upgrade pip setuptools wheel
                     pip install -r requirements.txt
-                '''
+                """
             }
         }
 
@@ -45,34 +43,35 @@ pipeline {
             steps {
                 script {
                     def credId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
-                                 params.ENV in ['ppd', 'ppd1'] ? 'GSA_PPD' :
+                                 params.ENV in ['ppd','ppd1'] ? 'GSA_PPD' :
                                  params.ENV == 'prd' ? 'GSA_PRD' :
                                  error("Unknown environment: ${params.ENV}")
 
                     withCredentials([file(credentialsId: credId, variable: 'CREDS_FILE')]) {
-                        withEnv([
-                            "GSA_NPD=${ (params.ENV in ['npd1','npd2','npd3','npd4','npd5']) ? CREDS_FILE : '' }",
-                            "GSA_PPD=${ (params.ENV in ['ppd','ppd1']) ? CREDS_FILE : '' }",
-                            "GSA_PRD=${ (params.ENV == 'prd') ? CREDS_FILE : '' }"
-                        ]) {
-                            sh '''
-                                #!/usr/bin/env bash
+                        def envVars = [
+                            "GSA_NPD=${ params.ENV.startsWith('npd') ? CREDS_FILE : '' }",
+                            "GSA_PPD=${ params.ENV in ['ppd','ppd1'] ? CREDS_FILE : '' }",
+                            "GSA_PRD=${ params.ENV == 'prd' ? CREDS_FILE : '' }"
+                        ]
+
+                        withEnv(envVars) {
+                            sh """
                                 set -euo pipefail
                                 . ${VENV_DIR}/bin/activate
                                 mkdir -p ${REPORTS_DIR}
 
                                 echo "Running tests on ${ENV}"
-                                echo "Using credentials file for ${ENV}: $(eval echo \$GSA_${ENV^^} 2>/dev/null || echo 'NOT FOUND')"
+                                echo "Using credentials file for ${ENV}: \$(eval echo \$GSA_\${ENV^^} 2>/dev/null || echo 'NOT FOUND')"
 
                                 MARKER_ARG=""
-                                [ -n "${MARKERS:-}" ] && MARKER_ARG="-m ${MARKERS}"
+                                [ -n "${MARKERS:-}" ] && MARKER_ARG="-m '${MARKERS}'"
 
-                                pytest --env ${ENV} \
-                                       -v \
-                                       --tb=short \
-                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \
-                                       $MARKER_ARG
-                            '''
+                                pytest --env ${ENV} \\
+                                       -v \\
+                                       --tb=short \\
+                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \\
+                                       \$MARKER_ARG
+                            """
                         }
                     }
                 }
@@ -81,7 +80,7 @@ pipeline {
 
         stage('Publish Reports') {
             steps {
-                archiveArtifacts artifacts: 'reports/**', fingerprint: true, allowEmptyArchive: false
+                archiveArtifacts artifacts: 'reports/**', fingerprint: true
 
                 publishHTML(target: [
                     allowMissing: false,
@@ -102,10 +101,10 @@ pipeline {
             sh 'rm -rf ${VENV_DIR}'
         }
         success {
-            echo "SUCCESS — All DQ checks passed on ${params.ENV}!"
+            echo "✅ SUCCESS — All DQ checks passed on ${params.ENV}!"
         }
         failure {
-            echo "FAILURE — DQ checks failed on ${params.ENV} — see HTML report"
+            echo "❌ FAILURE — DQ checks failed on ${params.ENV} — see HTML report"
         }
     }
 }
