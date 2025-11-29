@@ -4,36 +4,42 @@ prd:
   tables:
     AGT: "scalov.pieces.AGT"
     AGT_381: "scalov.pieces.AGT_381"
+  gcp_bucket: "my-dq-reports"
 
 ppd:
   credentials: ${GSA_PPD}
   project: "project2"
   tables:
     AGT: "project2.dataset.AGT"
+  gcp_bucket: "my-dq-reports"
 
 ppd1:
   credentials: ${GSA_PPD}
   project: "project2"
   tables:
     AGT: "project2.dataset_ws1.AGT"
+  gcp_bucket: "my-dq-reports"
 
 npd1:
   credentials: ${GSA_NPD}
   project: "project3"
   tables:
     AGT: "project3.dataset.AGT"
+  gcp_bucket: "my-dq-reports"
 
 npd2:
   credentials: ${GSA_NPD}
   project: "project3"
   tables:
     AGT: "project3.dataset_ws1.AGT"
+  gcp_bucket: "my-dq-reports"
 
 npd3:
   credentials: ${GSA_NPD}
   project: "project3"
   tables:
     AGT: "project3.dataset_ws2.AGT"
+  gcp_bucket: "my-dq-reports"
 
 npd4:
   credentials: ${GSA_NPD}
@@ -41,6 +47,7 @@ npd4:
   tables:
     AGT: "scalov.pieces_ws1.AGT"
     AGT_381: "scalov.pieces_ws1.AGT_381"
+  gcp_bucket: "my-dq-reports"
 
 npd5:
   credentials: ${GSA_NPD}
@@ -48,3 +55,4 @@ npd5:
   tables:
     AGT: "scalov.pieces.AGT"
     AGT_381: "scalov.pieces.AGT_381"
+  gcp_bucket: "my-dq-reports"
