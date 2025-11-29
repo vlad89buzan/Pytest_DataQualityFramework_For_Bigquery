@@ -5,7 +5,7 @@ pipeline {
         choice(name: 'ENV', choices: ['npd1','npd2','npd3','npd4','npd5','ppd','ppd1','prd'],
                description: 'Target BigQuery environment')
         string(name: 'MARKERS', defaultValue: '', trim: true,
-               description: 'Pytest markers, e.g. "smoke" or "critical and not slow"')
+               description: 'Pytest markers (e.g. smoke or "critical and not slow")')
         booleanParam(name: 'CLEAN_WORKSPACE', defaultValue: true,
                      description: 'Clean workspace before build')
     }
@@ -13,12 +13,6 @@ pipeline {
     environment {
         VENV_DIR    = "venv"
         REPORTS_DIR = "reports"
-
-        // Credential mapping – super clear and easy to extend
-        GSA_CREDENTIALS = credentials("${params.ENV.startsWith('npd') ? 'GSA_NPD' :
-                                        params.ENV.startsWith('ppd')  ? 'GSA_PPD' :
-                                        params.ENV == 'prd' ? 'GSA_PRD' :
-                                        'INVALID'}")
     }
 
     options {
@@ -36,7 +30,7 @@ pipeline {
             }
         }
 
-        stage('Setup Virtual Environment') {
+        stage('Install Dependencies') {
             steps {
                 sh '''
                     python3 -m venv ${VENV_DIR}
@@ -47,80 +41,76 @@ pipeline {
             }
         }
 
-        stage('Run Data Quality Tests') {
+        stage('Set Credentials and Run Tests') {
             steps {
-                withCredentials([file(credentialsId: "${env.GSA_CREDENTIALS}", variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                    sh '''
-                        . ${VENV_DIR}/bin/activate
+                script {
+                    def credsId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
+                                  params.ENV.startsWith('ppd') || params.ENV == 'ppd1' ? 'GSA_PPD' :
+                                  params.ENV == 'prd' ? 'GSA_PRD' :
+                                  error("Unknown environment: ${params.ENV}")
 
-                        # Create reports dir (in case no tests run)
-                        mkdir -p ${REPORTS_DIR}
+                    withCredentials([file(credentialsId: credsId, variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                        sh '''
+                            #!/usr/bin/env bash
+                            set -euo pipefail
 
-                        # Build marker argument only if MARKERS is not empty
-                        MARKER_ARG=""
-                        if [ -n "${MARKERS}" ]; then
-                            MARKER_ARG="-m \\"${MARKERS}\\""
-                        fi
+                            . ${VENV_DIR}/bin/activate
+                            mkdir -p ${REPORTS_DIR}
 
-                        echo "Running tests against environment: ${ENV}"
-                        echo "Markers: ${MARKERS}"
+                            # Correctly build the -m argument (only if MARKERS is not empty)
+                            if [ -n "${MARKERS:-}" ]; then
+                                MARKER_CMD="-m ${MARKERS}"
+                            else
+                                MARKER_CMD=""
+                            fi
 
-                        # Let conftest.py generate the timestamped report automatically
-                        eval pytest --env ${ENV} \
-                                     -v \
-                                     --tb=short \
-                                     --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \
-                                     $MARKER_ARG
-                    '''
+                            echo "Running pytest on environment: ${ENV}"
+                            echo "Markers: ${MARKERS:-<none>}"
+
+                            pytest --env ${ENV} \
+                                   -v \
+                                   --tb=short \
+                                   --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \
+                                   ${MARKER_CMD}
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Publish Reports') {
+        stage('Archive and Show Latest Report') {
             steps {
+                archiveArtifacts artifacts: 'reports/*', fingerprint: true, allowEmptyArchive: false
+
                 script {
-                    // Archive everything from reports/
-                    archiveArtifacts artifacts: 'reports/*.*', fingerprint: true, allowEmptyArchive: false
-
-                    // Find and display the latest HTML report
-                    def latestHtml = sh(script: "ls -t reports/report_*.html 2>/dev/null | head -1 || echo ''",
-                                        returnStdout: true).trim()
-                    if (latestHtml) {
-                        echo "HTML Report → ${env.BUILD_URL}artifact/${latestHtml}"
+                    def latest = sh(script: "ls -t reports/report_*.html 2>/dev/null | head -1 || true", returnStdout: true).trim()
+                    if (latest) {
+                        echo "Latest HTML report: ${env.BUILD_URL}artifact/${latest}"
                     }
-
-                    // Beautiful clickable report in Jenkins UI
-                    publishHTML(target: [
-                        allowMissing: false,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'reports',
-                        reportFiles: 'report_*.html',
-                        reportName: 'Data Quality HTML Report',
-                        reportTitles: 'BigQuery DQ Results'
-                    ])
                 }
 
-                // Standard Jenkins test results trending
-                junit testResults: 'reports/junit_*.xml', allowEmptyResults: true
+                publishHTML(target: [
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'reports',
+                    reportFiles: 'report_*.html',
+                    reportName: 'Data Quality HTML Report'
+                ])
             }
         }
     }
 
     post {
         always {
-            // Optional: clean venv to keep agents light
+            junit testResults: 'reports/junit_*.xml', allowEmptyResults: true
             sh 'rm -rf ${VENV_DIR}'
         }
         success {
-            echo "All data quality checks PASSED for ${params.ENV}"
+            echo "Data quality tests PASSED for ${params.ENV}"
         }
         failure {
-            echo "Data quality checks FAILED on ${params.ENV} — check the HTML report above!"
-        }
-        cleanup {
-            // Keep reports only via archiveArtifacts – workspace gets cleaned anyway
-            cleanWs(cleanWhenNotBuilt: false, deleteDirs: true)
+            echo "Data quality tests FAILED on ${params.ENV}"
         }
     }
 }
