@@ -1,44 +1,39 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(name: 'ENV', choices: ['npd5', 'ppd', 'prd'], description: 'Environment to run tests')
-        string(name: 'MARKERS', defaultValue: '', description: 'Pytest markers')
-    }
-
     environment {
-        // Determine which GSA creds to use
-        CREDS_FILE = "${params.ENV.toLowerCase().startsWith('npd') ? 'GSA_NPD' : params.ENV.toLowerCase().startsWith('ppd') ? 'GSA_PPD' : 'GSA_PRD'}"
+        ENVIRONMENT = "npd5" // your environment name
+        REPORT_DIR = "reports"
     }
 
     stages {
-        stage('Prepare') {
-            steps {
-                script {
-                    echo "Selected environment: ${params.ENV}"
-                    echo "Using credentials: ${CREDS_FILE}"
-                }
 
-                // Inject the secret file from Jenkins credentials
-                withCredentials([file(credentialsId: "${CREDS_FILE}", variable: 'GCP_KEYFILE')]) {
-                    sh '''
-                        python3 -m venv venv
-                        . venv/bin/activate
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
-                        echo "GCP credentials file: $GCP_KEYFILE"
-                    '''
-                }
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Prepare Python Environment') {
+            steps {
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                '''
             }
         }
 
         stage('Run Pytest') {
             steps {
-                withCredentials([file(credentialsId: "${CREDS_FILE}", variable: 'GCP_KEYFILE')]) {
+                // Use the secret file from Jenkins
+                withCredentials([file(credentialsId: 'GSA_NPD', variable: 'GCP_KEYFILE')]) {
                     sh '''
                         . venv/bin/activate
                         export GOOGLE_APPLICATION_CREDENTIALS=$GCP_KEYFILE
-                        pytest ${MARKERS:+-m $MARKERS}
+                        mkdir -p ${REPORT_DIR}
+                        pytest --html=${REPORT_DIR}/report_$(date +%Y%m%d_%H%M%S).html
                     '''
                 }
             }
@@ -47,7 +42,13 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'reports/*.html', allowEmptyArchive: true
+            archiveArtifacts artifacts: "${REPORT_DIR}/*.html", allowEmptyArchive: true
+        }
+        success {
+            echo "Pipeline succeeded!"
+        }
+        failure {
+            echo "Pipeline failed. Check the HTML report for details."
         }
     }
 }
