@@ -44,33 +44,38 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    def credsId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
-                                  params.ENV == 'ppd' || params.ENV == 'ppd1' ? 'GSA_PPD' :
-                                  params.ENV == 'prd' ? 'GSA_PRD' :
-                                  error("Invalid environment: ${params.ENV}")
+                    // Determine which credential file to inject
+                    def credId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
+                                 params.ENV in ['ppd', 'ppd1'] ? 'GSA_PPD' :
+                                 params.ENV == 'prd' ? 'GSA_PRD' :
+                                 error("Unknown environment: ${params.ENV}")
 
-                    withCredentials([file(credentialsId: credsId, variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                        sh """
-                            #!/usr/bin/env bash
-                            set -euo pipefail
+                    // Inject the actual JSON file path into the correct env var name
+                    withCredentials([file(credentialsId: credId, variable: 'CREDS_FILE') {
+                        withEnv([
+                            "GSA_NPD=${params.ENV.startsWith('npd') ? CREDS_FILE : ''}",
+                            "GSA_PPD=${params.ENV in ['ppd', 'ppd1'] ? CREDS_FILE : ''}",
+                            "GSA_PRD=${params.ENV == 'prd' ? CREDS_FILE : ''}"
+                        ]) {
+                            sh '''
+                                #!/usr/bin/env bash
+                                set -euo pipefail
+                                . ${VENV_DIR}/bin/activate
+                                mkdir -p ${REPORTS_DIR}
 
-                            . ${VENV_DIR}/bin/activate
-                            mkdir -p ${REPORTS_DIR}
+                                MARKER_ARG=""
+                                [ -n "${MARKERS:-}" ] && MARKER_ARG="-m ${MARKERS}"
 
-                            MARKER_CMD=""
-                            if [ -n "${params.MARKERS}" ]; then
-                                MARKER_CMD="-m ${params.MARKERS}"
-                            fi
+                                echo "Running tests on environment: ${ENV}"
+                                echo "Using credentials file: $(eval echo \$GSA_${ENV^^})"
 
-                            echo "Running tests against environment: ${params.ENV}"
-                            echo "Markers: ${params.MARKERS ?: '<none>'}"
-
-                            pytest --env ${params.ENV} \\
-                                   -v \\
-                                   --tb=short \\
-                                   --junitxml=${REPORTS_DIR}/junit_${params.ENV}_${BUILD_NUMBER}.xml \\
-                                   \$MARKER_CMD
-                        """
+                                pytest --env ${ENV} \\
+                                       -v \\
+                                       --tb=short \\
+                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \\
+                                       $MARKER_ARG
+                            '''
+                        }
                     }
                 }
             }
@@ -80,14 +85,6 @@ pipeline {
             steps {
                 archiveArtifacts artifacts: 'reports/**', fingerprint: true, allowEmptyArchive: false
 
-                script {
-                    def latest = sh(script: "ls -t reports/report_*.html 2>/dev/null | head -1 || echo ''",
-                                    returnStdout: true).trim()
-                    if (latest) {
-                        echo "Latest HTML report: ${env.BUILD_URL}artifact/${latest}"
-                    }
-                }
-
                 publishHTML(target: [
                     allowMissing: false,
                     alwaysLinkToLastBuild: true,
@@ -96,20 +93,21 @@ pipeline {
                     reportFiles: 'report_*.html',
                     reportName: 'Data Quality HTML Report'
                 ])
+
+                junit testResults: 'reports/junit_*.xml', allowEmptyResults: true
             }
         }
     }
 
     post {
         always {
-            junit testResults: 'reports/junit_*.xml', allowEmptyResults: true
             sh 'rm -rf ${VENV_DIR}'
         }
         success {
-            echo "All tests PASSED on ${params.ENV}!"
+            echo "SUCCESS — All DQ checks passed on ${params.ENV}!"
         }
         failure {
-            echo "Tests FAILED on ${params.ENV} — check the HTML report"
+            echo "FAILURE — DQ checks failed on ${params.ENV} — see HTML report"
         }
     }
 }
