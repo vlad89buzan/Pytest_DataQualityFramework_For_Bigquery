@@ -1,85 +1,75 @@
 pipeline {
-
     agent any
 
     parameters {
-        choice(name: 'ENV', choices: ['npd5', 'npd4'], description: 'Select environment')
-        string(name: 'MARKERS', defaultValue: '', description: 'Run only tests with markers')
+        choice(name: 'ENV', choices: ['npd1','npd2','npd3','npd4','npd5','ppd','ppd1','prd'], description: 'Environment to run tests against')
+        string(name: 'MARKERS', defaultValue: '', description: 'Pytest markers to filter tests (optional)')
     }
 
     environment {
-        VENV = "venv"
+        REPORTS_DIR = 'reports'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Prepare Python Environment') {
+        stage('Install Dependencies') {
             steps {
-                sh '''
-                    python3 -m venv ${VENV}
-                    ${VENV}/bin/pip install --upgrade pip
-                    ${VENV}/bin/pip install -r requirements.txt
-                    ${VENV}/bin/pip install pyyaml pytest pytest-html google-cloud-bigquery google-auth
-                '''
+                sh 'pip install -r requirements.txt'
             }
         }
 
-        stage('Determine Credentials') {
+        stage('Set Credentials and Run Tests') {
             steps {
                 script {
-                    if (params.ENV == "npd5") {
-                        env.GCP_CREDS = "npd5"   // <-- change to your actual Jenkins credentialsId
-                    } else if (params.ENV == "npd4") {
-                        env.GCP_CREDS = "npd4"   // <-- change to your actual Jenkins credentialsId
+                    // Map environment to credential ID and env var
+                    def credsId = ''
+                    def credsEnvVar = ''
+                    if (params.ENV.startsWith('npd')) {
+                        credsId = 'GSA_NPD'
+                        credsEnvVar = 'GSA_NPD'
+                    } else if (params.ENV.startsWith('ppd')) {
+                        credsId = 'GSA_PPD'
+                        credsEnvVar = 'GSA_PPD'
+                    } else if (params.ENV == 'prd') {
+                        credsId = 'GSA_PRD'
+                        credsEnvVar = 'GSA_PRD'
                     } else {
                         error "Unknown environment: ${params.ENV}"
                     }
-                    echo "Using GCP credentials: ${env.GCP_CREDS}"
+
+                    // Inject the secret file as environment variable
+                    withCredentials([file(credentialsId: credsId, variable: credsEnvVar)]) {
+                        // Run pytest with environment parameter and optional markers
+                        def pytest_cmd = "pytest --env ${params.ENV} -v --tb=short"
+                        if (params.MARKERS) {
+                            pytest_cmd += " -m \"${params.MARKERS}\""
+                        }
+                        sh pytest_cmd
+                    }
                 }
             }
         }
 
-        stage('Run Pytest') {
+        stage('Archive and Show Latest Report') {
             steps {
-                withCredentials([file(credentialsId: "${env.GCP_CREDS}", variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                    sh '''
-                        mkdir -p reports
-
-                        MARKER_OPTION=""
-                        if [ -n "${MARKERS}" ]; then
-                            MARKER_OPTION="-m '${MARKERS}'"
-                        fi
-
-                        echo "Running tests with marker option: $MARKER_OPTION"
-
-                        ${VENV}/bin/pytest \
-                            --env ${ENV} \
-                            $MARKER_OPTION \
-                            --html=reports/report.html \
-                            --self-contained-html \
-                            --junitxml=reports/results.xml
-                    '''
+                script {
+                    sh 'mkdir -p reports'
+                    archiveArtifacts artifacts: 'reports/*.html', fingerprint: true
+                    def latestReport = sh(script: "ls -t reports/*.html | head -1", returnStdout: true).trim()
+                    echo "Latest HTML report: ${latestReport}"
                 }
-            }
-        }
-
-        stage('Archive Reports') {
-            steps {
-                archiveArtifacts artifacts: 'reports/**/*.html', allowEmptyArchive: true
-                junit 'reports/results.xml'
             }
         }
     }
 
     post {
         always {
-            echo "Pipeline finished."
+            junit '**/reports/*.xml'  // optional if generating XML
         }
     }
 }
