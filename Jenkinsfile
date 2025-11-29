@@ -52,16 +52,6 @@ pipeline {
         always {
             // Archive HTML reports
             archiveArtifacts artifacts: 'reports/*.html', allowEmptyArchive: true
-
-            // Use script inside a valid post condition
-            script {
-                def reportFiles = findFiles(glob: 'reports/*.html')
-                if (reportFiles.length > 0) {
-                    echo "Reports generated: ${reportFiles.collect { it.name }}"
-                } else {
-                    echo "No report files found."
-                }
-            }
         }
     }
 }
