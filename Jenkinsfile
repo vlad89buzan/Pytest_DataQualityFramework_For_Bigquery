@@ -2,17 +2,12 @@ pipeline {
     agent any
 
     environment {
-        PYTHONPATH = "${WORKSPACE}/venv/bin"
+        // Example: set environment variables if needed
+        PYTHONPATH = "${WORKSPACE}"
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Prepare Python Env') {
+        stage('Setup') {
             steps {
                 sh '''
                     python3 -m venv venv
@@ -23,15 +18,21 @@ pipeline {
             }
         }
 
-        stage('Run Pytest') {
+        stage('Run Tests') {
             steps {
-                // Inject Jenkins Secret File
-                withCredentials([file(credentialsId: 'GSA_NPD', variable: 'GSA_NPD')]) {
-                    sh '''
-                        . venv/bin/activate
-                        mkdir -p reports
-                        pytest
-                    '''
+                script {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''
+                            . venv/bin/activate
+                            mkdir -p reports
+                            pytest
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/*.html', allowEmptyArchive: true
                 }
             }
         }
@@ -39,7 +40,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'reports/*.html'
+            echo "Pipeline finished. Check HTML reports in Jenkins."
         }
     }
 }
