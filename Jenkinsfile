@@ -41,49 +41,48 @@ pipeline {
             }
         }
 
-        stage('Set Credentials and Run Tests') {
+        stage('Run Tests') {
             steps {
                 script {
                     def credsId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
-                                  params.ENV.startsWith('ppd') || params.ENV == 'ppd1' ? 'GSA_PPD' :
+                                  params.ENV == 'ppd' || params.ENV == 'ppd1' ? 'GSA_PPD' :
                                   params.ENV == 'prd' ? 'GSA_PRD' :
-                                  error("Unknown environment: ${params.ENV}")
+                                  error("Invalid environment: ${params.ENV}")
 
                     withCredentials([file(credentialsId: credsId, variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                        sh '''
+                        sh """
                             #!/usr/bin/env bash
                             set -euo pipefail
 
                             . ${VENV_DIR}/bin/activate
                             mkdir -p ${REPORTS_DIR}
 
-                            # Correctly build the -m argument (only if MARKERS is not empty)
-                            if [ -n "${MARKERS:-}" ]; then
-                                MARKER_CMD="-m ${MARKERS}"
-                            else
-                                MARKER_CMD=""
+                            MARKER_CMD=""
+                            if [ -n "${params.MARKERS}" ]; then
+                                MARKER_CMD="-m ${params.MARKERS}"
                             fi
 
-                            echo "Running pytest on environment: ${ENV}"
-                            echo "Markers: ${MARKERS:-<none>}"
+                            echo "Running tests against environment: ${params.ENV}"
+                            echo "Markers: ${params.MARKERS ?: '<none>'}"
 
-                            pytest --env ${ENV} \
-                                   -v \
-                                   --tb=short \
-                                   --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \
-                                   ${MARKER_CMD}
-                        '''
+                            pytest --env ${params.ENV} \\
+                                   -v \\
+                                   --tb=short \\
+                                   --junitxml=${REPORTS_DIR}/junit_${params.ENV}_${BUILD_NUMBER}.xml \\
+                                   \$MARKER_CMD
+                        """
                     }
                 }
             }
         }
 
-        stage('Archive and Show Latest Report') {
+        stage('Publish Reports') {
             steps {
-                archiveArtifacts artifacts: 'reports/*', fingerprint: true, allowEmptyArchive: false
+                archiveArtifacts artifacts: 'reports/**', fingerprint: true, allowEmptyArchive: false
 
                 script {
-                    def latest = sh(script: "ls -t reports/report_*.html 2>/dev/null | head -1 || true", returnStdout: true).trim()
+                    def latest = sh(script: "ls -t reports/report_*.html 2>/dev/null | head -1 || echo ''",
+                                    returnStdout: true).trim()
                     if (latest) {
                         echo "Latest HTML report: ${env.BUILD_URL}artifact/${latest}"
                     }
@@ -107,10 +106,10 @@ pipeline {
             sh 'rm -rf ${VENV_DIR}'
         }
         success {
-            echo "Data quality tests PASSED for ${params.ENV}"
+            echo "All tests PASSED on ${params.ENV}!"
         }
         failure {
-            echo "Data quality tests FAILED on ${params.ENV}"
+            echo "Tests FAILED on ${params.ENV} — check the HTML report"
         }
     }
 }
