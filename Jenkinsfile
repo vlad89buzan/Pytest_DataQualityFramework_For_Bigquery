@@ -26,7 +26,11 @@ pipeline {
         stage('Run Pytest') {
             steps {
                 // Inject Jenkins Secret File
-                withCredentials([file(credentialsId: 'GSA_NPD', variable: 'GSA_NPD')]) {
+                withCredentials([
+                    file(credentialsId: 'GSA_NPD', variable: 'GSA_NPD'),
+                    file(credentialsId: 'GSA_PPD', variable: 'GSA_PPD'),
+                    file(credentialsId: 'GSA_PRD', variable: 'GSA_PRD')
+                    ]) {
                     sh '''
                         . venv/bin/activate
                         mkdir -p reports
