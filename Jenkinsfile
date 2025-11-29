@@ -2,26 +2,22 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'ENV', choices: ['npd1','npd2','npd3','npd4','npd5','ppd','ppd1','prd'],
-               description: 'Target BigQuery environment')
-        string(name: 'MARKERS', defaultValue: '', trim: true,
-               description: 'Pytest markers (e.g. smoke or "critical and not slow")')
+        string(name: 'ENV', defaultValue: 'npd5', description: 'Environment to run tests on (npd5, ppd, prd, etc.)')
+        string(name: 'MARKERS', defaultValue: '', description: 'Optional pytest markers')
     }
 
     environment {
-        VENV_DIR    = "venv"
-        REPORTS_DIR = "reports"
+        VENV_DIR = "venv"
     }
 
     options {
-        timeout(time: 90, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '30'))
         timestamps()
+        timeout(time: 1, unit: 'HOURS')
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
             }
@@ -29,50 +25,41 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh '''
+                sh """
                     python3 -m venv ${VENV_DIR}
                     . ${VENV_DIR}/bin/activate
                     pip install --upgrade pip setuptools wheel
                     pip install -r requirements.txt
-                '''
+                """
             }
         }
 
         stage('Run Tests') {
             steps {
                 script {
-                    // Map environment to Jenkins credential ID
-                    def credId = params.ENV.startsWith('npd') ? 'GSA_NPD' :
-                                 params.ENV in ['ppd','ppd1'] ? 'GSA_PPD' :
-                                 params.ENV == 'prd' ? 'GSA_PRD' :
-                                 error("Unknown environment: ${params.ENV}")
+                    // Select the proper GSA creds based on ENV prefix
+                    def envPrefix = params.ENV?.toLowerCase() ?: ''
+                    def gsa_creds = ''
+                    if (envPrefix.startsWith('npd')) {
+                        gsa_creds = 'GSA_NPD'
+                    } else if (envPrefix.startsWith('ppd')) {
+                        gsa_creds = 'GSA_PPD'
+                    } else if (envPrefix.startsWith('prd')) {
+                        gsa_creds = 'GSA_PRD'
+                    } else {
+                        error "Unknown environment prefix: ${params.ENV}"
+                    }
 
-                    withCredentials([file(credentialsId: credId, variable: 'CREDS_FILE')]) {
-                        def envVars = [
-                            "GSA_NPD=${ params.ENV.startsWith('npd') ? CREDS_FILE : '' }",
-                            "GSA_PPD=${ params.ENV in ['ppd','ppd1'] ? CREDS_FILE : '' }",
-                            "GSA_PRD=${ params.ENV == 'prd' ? CREDS_FILE : '' }"
-                        ]
-
-                        withEnv(envVars) {
-                            sh '''
-                                #!/usr/bin/env bash
+                    withCredentials([file(credentialsId: gsa_creds, variable: 'GSA_')]) {
+                        withEnv(["MARKERS=${params.MARKERS ?: ''}"]) {
+                            sh """
                                 set -euo pipefail
                                 . ${VENV_DIR}/bin/activate
-                                mkdir -p ${REPORTS_DIR}
-
-                                echo "Running tests on ${ENV}"
-                                echo "Using credentials file for ${ENV}: $(eval echo \$GSA_${ENV^^} 2>/dev/null || echo 'NOT FOUND')"
-
-                                MARKER_ARG=""
-                                [ -n "${MARKERS}" ] && MARKER_ARG="-m '${MARKERS}'"
-
-                                pytest --env ${ENV} \
-                                       -v \
-                                       --tb=short \
-                                       --junitxml=${REPORTS_DIR}/junit_${ENV}_${BUILD_NUMBER}.xml \
-                                       $MARKER_ARG
-                            '''
+                                mkdir -p reports
+                                echo "Running tests on ${params.ENV}"
+                                echo "Using credentials file: \$GSA_"
+                                pytest tests/ \$MARKERS --html=reports/report.html
+                            """
                         }
                     }
                 }
@@ -81,31 +68,28 @@ pipeline {
 
         stage('Publish Reports') {
             steps {
-                archiveArtifacts artifacts: 'reports/**', fingerprint: true
-
                 publishHTML(target: [
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
+                    reportName: 'Test Report',
                     reportDir: 'reports',
-                    reportFiles: 'report_*.html',
-                    reportName: 'Data Quality HTML Report'
+                    reportFiles: 'report.html',
+                    keepAll: true,
+                    alwaysLinkToLastBuild: true,
+                    allowMissing: false
                 ])
-
-                junit testResults: 'reports/junit_*.xml', allowEmptyResults: true
             }
         }
+
     }
 
     post {
         always {
-            sh 'rm -rf ${VENV_DIR}'
+            sh "rm -rf ${VENV_DIR}"
         }
         success {
-            echo "✅ SUCCESS — All DQ checks passed on ${params.ENV}!"
+            echo "✅ Tests completed successfully."
         }
         failure {
-            echo "❌ FAILURE — DQ checks failed on ${params.ENV} — see HTML report"
+            echo "❌ Tests failed — see HTML report for details."
         }
     }
 }
