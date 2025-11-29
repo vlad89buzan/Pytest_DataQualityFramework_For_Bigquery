@@ -131,6 +131,11 @@ class DataQualityLibrary:
         assert not df.empty, "DataFrame is empty"
 
     @staticmethod
+    def check_dataset_is_empty(df: pd.DataFrame):
+        """Check that the DataFrame is not empty."""
+        assert  df.empty, "DataFrame is not empty"
+
+    @staticmethod
     def check_not_null_values(df: pd.DataFrame, column_names=None):
         """Check that specified columns do not contain null values."""
         if column_names:

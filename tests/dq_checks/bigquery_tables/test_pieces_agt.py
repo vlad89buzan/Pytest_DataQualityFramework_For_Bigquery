@@ -131,3 +131,23 @@ def test_counts(expected, actual, data_quality_library):
 @pytest.mark.tcid("TC-132")
 def test_datasets(expected, actual, data_quality_library):
     data_quality_library.check_data_full_data_set(expected, actual)
+
+@pytest.fixture(scope='module')
+def source_data2(bq_connector, table_AGT):
+    """Load full data from AGT table."""
+    target_query = f"SELECT * FROM `{table_AGT}` where Thickness=18"
+    df = bq_connector.get_data_sql(target_query)
+    return df
+@pytest.mark.tcid("TC-133")
+def test_source_data2_is_empty(data_quality_library, source_data2):
+    data_quality_library.check_dataset_is_empty(source_data2)
+
+@pytest.fixture(scope='module')
+def source_data3(bq_connector, table_AGT):
+    """Load full data from AGT table."""
+    target_query = f"SELECT * FROM `{table_AGT}` where Thickness=17"
+    df = bq_connector.get_data_sql(target_query)
+    return df
+@pytest.mark.tcid("TC-134")
+def test_source_data3_is_empty(data_quality_library, source_data3):
+    data_quality_library.check_dataset_is_empty(source_data3)
