@@ -2,19 +2,17 @@ pipeline {
     agent any
 
     environment {
-        ENVIRONMENT = "npd5" // your environment name
-        REPORT_DIR = "reports"
+        PYTHONPATH = "${WORKSPACE}/venv/bin"
     }
 
     stages {
-
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Prepare Python Environment') {
+        stage('Prepare Python Env') {
             steps {
                 sh '''
                     python3 -m venv venv
@@ -27,13 +25,12 @@ pipeline {
 
         stage('Run Pytest') {
             steps {
-                // Use the secret file from Jenkins
-                withCredentials([file(credentialsId: 'GSA_NPD', variable: 'GCP_KEYFILE')]) {
+                // Inject Jenkins Secret File
+                withCredentials([file(credentialsId: 'GSA_NPD', variable: 'GSA_NPD')]) {
                     sh '''
                         . venv/bin/activate
-                        export GOOGLE_APPLICATION_CREDENTIALS=$GCP_KEYFILE
-                        mkdir -p ${REPORT_DIR}
-                        pytest --html=${REPORT_DIR}/report_$(date +%Y%m%d_%H%M%S).html
+                        mkdir -p reports
+                        pytest
                     '''
                 }
             }
@@ -42,13 +39,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: "${REPORT_DIR}/*.html", allowEmptyArchive: true
-        }
-        success {
-            echo "Pipeline succeeded!"
-        }
-        failure {
-            echo "Pipeline failed. Check the HTML report for details."
+            archiveArtifacts artifacts: 'reports/*.html'
         }
     }
 }
