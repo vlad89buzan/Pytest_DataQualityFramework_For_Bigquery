@@ -151,3 +151,14 @@ def source_data3(bq_connector, table_AGT):
 @pytest.mark.tcid("TC-134")
 def test_source_data3_is_empty(data_quality_library, source_data3):
     data_quality_library.check_dataset_is_empty(source_data3)
+
+@pytest.fixture(scope='module')
+def source_data4(bq_connector, table_AGT,current_release_date):
+    """Load full data from AGT table."""
+    target_query = f"SELECT * FROM `{table_AGT}` where date(bq_load_dttm)>'{current_release_date}'"
+    df = bq_connector.get_data_sql(target_query)
+    return df
+
+@pytest.mark.tcid("TC-135")
+def test_source_data4_is_not_empty(data_quality_library, source_data4):
+    data_quality_library.check_dataset_is_not_empty(source_data4)

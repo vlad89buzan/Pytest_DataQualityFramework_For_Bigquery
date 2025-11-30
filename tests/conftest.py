@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from utils.upload_to_gcp import * # upload to bucket
 from tests.fixtures.bigquery_fixtures import *
 from tests.fixtures.data_quality_fixtures import *
+from tests.fixtures.global_vars_fixture import *
 
 
 # ───────────────────────────────
