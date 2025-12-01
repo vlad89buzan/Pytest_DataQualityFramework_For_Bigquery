@@ -7,7 +7,7 @@ load_dotenv()
 print(os.getenv('GSA_NPD'))
 env_name = 'npd5'
 
-with open("config/env_config.yaml", "r") as f:
+with open("../config/env_config.yaml", "r") as f:
     content = f.read()
 
 
